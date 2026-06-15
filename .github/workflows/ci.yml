@@ -41,7 +41,6 @@ jobs:
     name: Build (main)
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
 
@@ -70,7 +69,6 @@ jobs:
     name: GitHub Release
     needs: test
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:
