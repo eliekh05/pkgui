@@ -7,7 +7,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 
-// ─── ANSI helpers ─────────────────────────────────────────────────────────────
+// ─── ANSI helpers ────────────────────────────────────────────────────────
 const C = {
   reset:        '\x1b[0m',
   bold:         '\x1b[1m',
@@ -28,7 +28,7 @@ const C = {
   brightWhite:  '\x1b[97m',
 }
 
-// ─── xterm.js themes ─────────────────────────────────────────────────────────
+// ─── xterm.js themes ───────────────────────────────────────────────────────
 export const THEMES = {
   dark: {
     background: '#0d1117',
@@ -80,7 +80,7 @@ export const THEMES = {
 // ─── Local execution server ──────────────────────────────────────────────────
 const EXEC_SERVER = 'http://127.0.0.1:7274'
 
-// ─── Terminal class ───────────────────────────────────────────────────────────
+// ─── Terminal class ────────────────────────────────────────────────────────
 export class PkguiTerminal {
   constructor(container, opts = {}) {
     this.container = container
@@ -130,7 +130,7 @@ export class PkguiTerminal {
     this._checkExecServer()   // non-blocking — updates _execAvailable
   }
 
-  // ─── Input handling ────────────────────────────────────────────────────────
+  // ─── Input handling ───────────────────────────────────────────────────────
   _setupInput() {
     let inputBuffer = ''
 
@@ -209,7 +209,7 @@ export class PkguiTerminal {
     this.term.write(next)
   }
 
-  // ─── Banner ────────────────────────────────────────────────────────────────
+  // ─── Banner ─────────────────────────────────────────────────────────
   _printBanner() {
     const v = typeof __VERSION__ !== 'undefined' ? __VERSION__ : '1.0.0'
     const lines = [
@@ -281,7 +281,7 @@ export class PkguiTerminal {
     }
   }
 
-  // ─── Commands ─────────────────────────────────────────────────────────────
+  // ─── Commands ─────────────────────────────────────────────────────────
   _printHelp() {
     const lines = [
       '',
@@ -518,6 +518,12 @@ export class PkguiTerminal {
   // ─── Execution server integration ──────────────────────────────────────────
 
   async _checkExecServer() {
+    // Skip exec server check in browser environment (can't reach localhost from HTTPS)
+    if (typeof window !== 'undefined' && window.location?.protocol === 'https:') {
+      this._execAvailable = false
+      return
+    }
+
     try {
       const r = await fetch(`${EXEC_SERVER}/health`, {
         signal: AbortSignal.timeout(1500),
@@ -654,7 +660,7 @@ export class PkguiTerminal {
     this._printPrompt()
   }
 
-  // ─── Public API ───────────────────────────────────────────────────────────
+  // ─── Public API ────────────────────────────────────────────────────────
   setManager(manager) {
     this.currentManager = manager
     this.term.writeln(
