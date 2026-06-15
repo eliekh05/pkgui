@@ -1,0 +1,31 @@
+{
+  "name": "pkgui",
+  "version": "1.0.0",
+  "description": "Universal Package Manager GUI — xterm.js powered, Cloudflare Worker compatible",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:worker": "esbuild worker/index.js --bundle --outfile=dist/worker.js --platform=browser --format=esm --minify",
+    "build:all": "npm run build && npm run build:worker",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "server": "node server.js",
+    "package": "node scripts/package.js",
+    "release": "node scripts/release.js"
+  },
+  "keywords": ["package-manager", "xterm", "terminal", "gui", "cloudflare-worker"],
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "vite": "^5.0.0",
+    "vitest": "^1.0.0",
+    "archiver": "^6.0.1"
+  },
+  "dependencies": {
+    "@xterm/xterm": "^6.0.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0"
+  }
+}
