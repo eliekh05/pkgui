@@ -1,0 +1,176 @@
+name: CI / CD
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Test ──────────────────────────────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+  # ── 2. Build ─────────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build SPA
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+
+  # ── 3. Deploy to Cloudflare Pages PRODUCTION (main branch only) ──────────────
+  #
+  #  --branch=production  →  your live URL  (pkgui.pages.dev / custom domain)
+  #  --branch=anything    →  preview URL    (random.pkgui.pages.dev)
+  #
+  #  We ONLY deploy on push to main, and we always target production branch
+  #  so every merge to main updates the real live site immediately.
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy → Cloudflare Pages (production)
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ github.sha }}
+          path: dist/
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          # --branch=production  →  this IS the live site, not a preview
+          command: pages deploy dist/ --project-name=pkgui --branch=production
+
+  # ── 4. GitHub Release (v* tags only) ────────────────────────────────────────
+  release:
+    name: GitHub Release
+    needs: test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Extract version
+        id: ver
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Build SPA
+        run: npm run build
+        env:
+          NODE_ENV: production
+          VITE_VERSION: ${{ steps.ver.outputs.VERSION }}
+
+      - name: Build single-file bundle
+        run: |
+          BUNDLE_SINGLE=1 npx vite build --outDir dist-bundle
+          node scripts/inline-bundle.js
+        env:
+          NODE_ENV: production
+          VITE_VERSION: ${{ steps.ver.outputs.VERSION }}
+
+      - name: Package artifacts
+        run: node scripts/package.js ${{ steps.ver.outputs.VERSION }}
+
+      - name: Generate changelog
+        id: log
+        run: |
+          PREV=$(git tag --sort=-version:refname | sed -n '2p')
+          if [ -n "$PREV" ]; then
+            BODY=$(git log ${PREV}..HEAD --pretty=format:"- %s" --no-merges | head -40)
+          else
+            BODY=$(git log --pretty=format:"- %s" --no-merges | head -20)
+          fi
+          echo "BODY<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY"    >> $GITHUB_OUTPUT
+          echo "EOF"      >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: pkgui v${{ steps.ver.outputs.VERSION }}
+          tag_name: v${{ steps.ver.outputs.VERSION }}
+          prerelease: ${{ contains(steps.ver.outputs.VERSION, '-') }}
+          body: |
+            ## 📦 pkgui v${{ steps.ver.outputs.VERSION }}
+
+            ### Downloads
+            | File | Description |
+            |------|-------------|
+            | `pkgui-${{ steps.ver.outputs.VERSION }}-bundle.html` | **Single file** — open directly in any browser, no server needed |
+            | `pkgui-${{ steps.ver.outputs.VERSION }}-dist.zip` | Full build for self-hosting |
+            | `pkgui-${{ steps.ver.outputs.VERSION }}-source.tar.gz` | Source tarball |
+
+            ### Changes
+            ${{ steps.log.outputs.BODY }}
+
+            ---
+            Built from `${{ github.sha }}`
+          files: |
+            release/pkgui-${{ steps.ver.outputs.VERSION }}-bundle.html
+            release/pkgui-${{ steps.ver.outputs.VERSION }}-dist.zip
+            release/pkgui-${{ steps.ver.outputs.VERSION }}-source.tar.gz
+
+      # Also push this tagged version to the live site
+      - name: Deploy release → Cloudflare Pages (production)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: pages deploy dist/ --project-name=pkgui --branch=production
