@@ -28,7 +28,7 @@ const C = {
   brightWhite:  '\x1b[97m',
 }
 
-// ─── xterm.js themes ───────────────────────────────────────────────────────
+// ─── xterm.js themes ────────────────���──────────────────────────────────────
 export const THEMES = {
   dark: {
     background: '#0d1117',
@@ -130,7 +130,7 @@ export class PkguiTerminal {
     this._checkExecServer()   // non-blocking — updates _execAvailable
   }
 
-  // ─── Input handling ───────────────────────────────────────────────────────
+  // ─── Input handling ───────��───────────────────────────────────────────────
   _setupInput() {
     let inputBuffer = ''
 
@@ -518,12 +518,6 @@ export class PkguiTerminal {
   // ─── Execution server integration ──────────────────────────────────────────
 
   async _checkExecServer() {
-    // Skip exec server check in browser environment (can't reach localhost from HTTPS)
-    if (typeof window !== 'undefined' && window.location?.protocol === 'https:') {
-      this._execAvailable = false
-      return
-    }
-
     try {
       const r = await fetch(`${EXEC_SERVER}/health`, {
         signal: AbortSignal.timeout(1500),
