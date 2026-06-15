@@ -18,7 +18,16 @@ import archiver from 'archiver'
 const version = process.argv[2] || JSON.parse(readFileSync('package.json', 'utf8')).version
 const releaseDir = resolve('release')
 
+// Ensure release directory exists before any operations
 mkdirSync(releaseDir, { recursive: true })
+
+// Validate version
+if (!version || version.includes('/')) {
+  console.error(`❌ Invalid version: "${version}"`)
+  console.error('   Ensure tag is in format: v1.0.0, v1.2.3, etc.')
+  process.exit(1)
+}
+
 console.log(`\n📦 Packaging pkgui v${version}...\n`)
 
 // ─── 1. Zip the dist/ folder ──────────────────────────────────────────────────
@@ -87,7 +96,7 @@ function sourceTarball() {
   }
 }
 
-// ─── Run ──────────────────────────────────────────────────────────────────────
+// ─── Run ─────────────────────────────────────────────────────────────────────
 async function main() {
   await zipDist()
   copyWorker()
