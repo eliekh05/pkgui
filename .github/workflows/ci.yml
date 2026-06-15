@@ -54,16 +54,9 @@ jobs:
           path: dist/
           retention-days: 7
 
-  # ── 3. Deploy to Cloudflare Pages PRODUCTION (main branch only) ──────────────
-  #
-  #  --branch=production  →  your live URL  (pkgui.pages.dev / custom domain)
-  #  --branch=anything    →  preview URL    (random.pkgui.pages.dev)
-  #
-  #  We ONLY deploy on push to main, and we always target production branch
-  #  so every merge to main updates the real live site immediately.
-  # ─────────────────────────────────────────────────────────────────────────────
+  # ── 3. Deploy → Cloudflare Pages (main branch → live site) ──────────────────
   deploy:
-    name: Deploy → Cloudflare Pages (production)
+    name: Deploy → Cloudflare Pages
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -82,12 +75,14 @@ jobs:
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          # --branch=production  →  this IS the live site, not a preview
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist/ --project-name=pkgui --branch=production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-  # ── 4. GitHub Release (v* tags only) ────────────────────────────────────────
+  # ── 4. GitHub Release (v* tags) ──────────────────────────────────────────────
   release:
     name: GitHub Release
     needs: test
@@ -167,10 +162,12 @@ jobs:
             release/pkgui-${{ steps.ver.outputs.VERSION }}-dist.zip
             release/pkgui-${{ steps.ver.outputs.VERSION }}-source.tar.gz
 
-      # Also push this tagged version to the live site
-      - name: Deploy release → Cloudflare Pages (production)
+      - name: Deploy release → Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist/ --project-name=pkgui --branch=production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
