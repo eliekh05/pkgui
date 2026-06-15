@@ -2,7 +2,8 @@ name: CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
+    tags: ['v*.*.*']
   pull_request:
     branches: [main]
 
@@ -40,6 +41,7 @@ jobs:
     name: Build (main)
     needs: test
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
 
@@ -63,11 +65,48 @@ jobs:
           path: dist/
           retention-days: 7
 
+  # ─── Deploy to Cloudflare Pages (main branch) ─────────────────────────────
+  deploy-preview:
+    name: Deploy to Cloudflare Pages
+    needs: build-main
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: pkgui-dist-${{ github.sha }}
+          path: dist/
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist/ --project-name=pkgui --branch=main
+        env:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
   # ─── Release Build (tag → compiled single-file bundle for GitHub Releases) ──
   release:
     name: GitHub Release
     needs: test
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:
@@ -161,11 +200,21 @@ jobs:
             release/pkgui-${{ steps.version.outputs.VERSION }}-worker.js
             release/pkgui-${{ steps.version.outputs.VERSION }}-source.tar.gz
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
 
-  # ─── Deploy Worker separately ────────────────────────────────────────────
+      - name: Deploy release to Cloudflare Pages (production)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist/ --project-name=pkgui --branch=production
+        env:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  # ─── Deploy Worker API separately ────────────────────────────────────────────
   deploy-worker:
-    name: Deploy Cloudflare Worker
+    name: Deploy Cloudflare Worker (API)
     needs: release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
