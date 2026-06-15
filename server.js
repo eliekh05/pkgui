@@ -18,8 +18,8 @@ import { spawn }         from 'node:child_process'
 import { randomUUID }    from 'node:crypto'
 
 const PORT   = 7274
-const HOST   = '127.0.0.1'
-const ORIGIN = 'http://localhost:5173'
+const HOST   = 'https://pkgui.eliekh05.workers.dev'
+const ORIGIN = 'https://pkgui.eliekh05.workers.dev:5173'
 
 // id → { cmd, proc, sseClients: Set<res> }
 const sessions = new Map()
