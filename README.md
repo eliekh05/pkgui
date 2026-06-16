@@ -15,7 +15,7 @@
 - **Command builder** — select a manager, type a package name, get the exact command
 - **Compare view** — see the install command for a package across every manager (`Ctrl+K`)
 - **4 themes** — Dark, Light, Dracula, Nord
-- **Single-file releases** — every GitHub Release ships a compiled standalone `.html` you can open with no install
+- **Single-file releases** — every GitHub Release ships a standalone zip (`server.js` + UI) you can run with one command
 
 ---
 
@@ -125,7 +125,8 @@ git push origin main
 To release a specific version (minor/major bump), update `version` in `package.json` before pushing.
 
 Each release includes:
-- `pkgui-{version}-bundle.html` — single compiled file, open in any browser
+- `pkgui-{version}-standalone.zip` — **recommended** — unzip, run `./start` (or `node server.js`) — opens UI with exec server
+- `pkgui-{version}-bundle.html` — HTML only (use standalone zip for command execution)
 - `pkgui-{version}-dist.zip` — full build for self-hosting
 - `pkgui-{version}-source.tar.gz` — source tarball
 
@@ -137,7 +138,8 @@ Each release includes:
 npm run dev      # dev server + local execution backend
 npm run build    # production build → dist/
 npm test         # vitest tests
-npm run server   # execution backend only (e.g. with the standalone .html)
+npm run server   # bundled UI + exec server (opens http://127.0.0.1:7274)
+npm start        # same as npm run server
 ```
 
 ---

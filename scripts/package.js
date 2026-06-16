@@ -53,9 +53,39 @@ function sourceTarball() {
   }
 }
 
+async function zipStandalone() {
+  const bundleSrc = join(releaseDir, `pkgui-${version}-bundle.html`)
+  const serverSrc = resolve('server.js')
+  if (!existsSync(bundleSrc) || !existsSync(serverSrc)) {
+    console.warn('  ⚠️  bundle or server.js missing — skipping standalone.zip')
+    return
+  }
+
+  const startScript = `#!/bin/sh
+cd "$(dirname "$0")"
+exec node server.js --open
+`
+
+  return new Promise((res, rej) => {
+    const output = createWriteStream(join(releaseDir, `pkgui-${version}-standalone.zip`))
+    const archive = archiver('zip', { zlib: { level: 9 } })
+    output.on('close', () => {
+      console.log(`  ✅ standalone.zip — ${(archive.pointer() / 1024).toFixed(0)} KB`)
+      res()
+    })
+    archive.on('error', rej)
+    archive.pipe(output)
+    archive.file(serverSrc, { name: 'server.js' })
+    archive.file(bundleSrc, { name: 'pkgui.html' })
+    archive.append(startScript, { name: 'start', mode: 0o755 })
+    archive.finalize()
+  })
+}
+
 async function main() {
   await zipDist()
   copyBundle()
+  await zipStandalone()
   sourceTarball()
   console.log(`\n🎉 Done — artifacts in ./release/\n`)
 }

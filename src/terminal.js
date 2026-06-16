@@ -78,7 +78,16 @@ export const THEMES = {
 }
 
 // ─── Local execution server ──────────────────────────────────────────────────
-const EXEC_SERVER = 'http://127.0.0.1:7274'
+function execServerUrl() {
+  if (typeof window === 'undefined') return 'http://127.0.0.1:7274'
+  if (window.location.protocol === 'http:' && window.location.port === '7274') {
+    return window.location.origin
+  }
+  return 'http://127.0.0.1:7274'
+}
+const EXEC_SERVER = execServerUrl()
+const IS_STANDALONE = typeof document !== 'undefined' &&
+  document.querySelector('meta[name="standalone"]') !== null
 
 // ─── Terminal class ────────────────────────────────────────────────────────
 export class PkguiTerminal {
@@ -307,7 +316,7 @@ export class PkguiTerminal {
       `  ${C.yellow}clear${C.reset}               Clear terminal (also Ctrl+L)`,
       `  ${C.yellow}version${C.reset}             Show version`,
       '',
-      `${C.bold}${C.brightWhite}EXECUTION${C.reset} ${C.dim}(included in npm run dev)${C.reset}`,
+      `${C.bold}${C.brightWhite}EXECUTION${C.reset} ${C.dim}(${this._execHelpContext()})${C.reset}`,
       `  ${C.brightGreen}run${C.reset}                 Execute the last generated command locally`,
       `  ${C.dim}Ctrl+C cancels a running command · stdin is forwarded interactively${C.reset}`,
       '',
@@ -517,6 +526,21 @@ export class PkguiTerminal {
 
   // ─── Execution server integration ──────────────────────────────────────────
 
+  _execHelpContext() {
+    if (typeof window !== 'undefined' && window.location.port === '7274') {
+      return 'included when served by npm run server'
+    }
+    if (IS_STANDALONE) return 'run npm run server in the bundle folder'
+    return 'included in npm run dev'
+  }
+
+  _execServerHint() {
+    if (IS_STANDALONE) {
+      return `${C.dim}  Run${C.reset}  ${C.brightYellow}npm run server${C.reset}  ${C.dim}in the bundle folder — it opens${C.reset}  ${C.brightYellow}http://127.0.0.1:7274${C.reset}`
+    }
+    return `${C.dim}  Use${C.reset}  ${C.brightYellow}npm run dev${C.reset}  ${C.dim}or${C.reset}  ${C.brightYellow}npm run server${C.reset}`
+  }
+
   async _checkExecServer() {
     try {
       const r = await fetch(`${EXEC_SERVER}/health`, {
@@ -531,7 +555,14 @@ export class PkguiTerminal {
         this._printPrompt()
       }
     } catch {
-      this._execAvailable = false   // server not running — silent
+      this._execAvailable = false
+      if (IS_STANDALONE && window.location.protocol === 'file:') {
+        this.term.writeln(
+          `  ${C.yellow}⚠  Open via server for command execution:${C.reset}  ${C.brightYellow}npm run server${C.reset}`
+        )
+        this.term.writeln('')
+        this._printPrompt()
+      }
     }
   }
 
@@ -554,7 +585,7 @@ export class PkguiTerminal {
     if (!this._execAvailable) {
       this.term.writeln('')
       this.term.writeln(`${C.yellow}⚠  Exec server not running.${C.reset}`)
-      this.term.writeln(`${C.dim}  Use${C.reset}  ${C.brightYellow}npm run dev${C.reset}  ${C.dim}or start it separately:${C.reset}  ${C.brightYellow}npm run server${C.reset}`)
+      this.term.writeln(this._execServerHint())
       this.term.writeln('')
       return
     }

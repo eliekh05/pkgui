@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "server": "node server.js"
+    "server": "node server.js --open",
+    "start": "node server.js --open"
   },
   "keywords": ["package-manager", "xterm", "terminal", "gui"],
   "license": "MIT",
