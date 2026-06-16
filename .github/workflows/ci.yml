@@ -1,0 +1,150 @@
+name: CI / CD
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ─── Run tests on every push and PR ─────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+  # ─── Build on every push to main — proves main always compiles ───────────────
+  build:
+    name: Build
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+        env:
+          NODE_ENV: production
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pkgui-dist-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+
+  # ─── On tag v*.*.* → build bundle → publish GitHub Release ──────────────────
+  #
+  #  main branch  → normal source code lives here (what you develop)
+  #  git tag      → triggers this job → produces ONE compiled .html file
+  #                 attached to the GitHub Release as a download
+  #
+  #  To release:
+  #    git tag v1.0.0
+  #    git push origin v1.0.0
+  # ────────────────────────────────────────────────────────────────────────────
+  release:
+    name: GitHub Release
+    needs: test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Extract version from tag
+        id: ver
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      # Step 1 — normal build (goes into dist.zip)
+      - name: Build SPA
+        run: npm run build
+        env:
+          NODE_ENV: production
+          VITE_VERSION: ${{ steps.ver.outputs.VERSION }}
+
+      # Step 2 — single-file bundle (the main release asset)
+      - name: Build single-file bundle
+        run: |
+          BUNDLE_SINGLE=1 npx vite build --outDir dist-bundle
+          node scripts/inline-bundle.js
+        env:
+          NODE_ENV: production
+          VITE_VERSION: ${{ steps.ver.outputs.VERSION }}
+
+      # Step 3 — package everything into release/
+      - name: Package artifacts
+        run: node scripts/package.js ${{ steps.ver.outputs.VERSION }}
+
+      # Step 4 — auto changelog from git log
+      - name: Generate changelog
+        id: log
+        run: |
+          PREV=$(git tag --sort=-version:refname | sed -n '2p')
+          if [ -n "$PREV" ]; then
+            BODY=$(git log ${PREV}..HEAD --pretty=format:"- %s" --no-merges | head -40)
+          else
+            BODY=$(git log --pretty=format:"- %s" --no-merges | head -20)
+          fi
+          echo "BODY<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY"    >> $GITHUB_OUTPUT
+          echo "EOF"      >> $GITHUB_OUTPUT
+
+      # Step 5 — publish release with the compiled bundle as primary asset
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: pkgui v${{ steps.ver.outputs.VERSION }}
+          tag_name: v${{ steps.ver.outputs.VERSION }}
+          prerelease: ${{ contains(steps.ver.outputs.VERSION, '-') }}
+          body: |
+            ## 📦 pkgui v${{ steps.ver.outputs.VERSION }}
+
+            ### Downloads
+
+            | File | Description |
+            |------|-------------|
+            | `pkgui-${{ steps.ver.outputs.VERSION }}-bundle.html` | **Single compiled file** — open directly in any browser, zero install |
+            | `pkgui-${{ steps.ver.outputs.VERSION }}-dist.zip` | Full build output for self-hosting |
+            | `pkgui-${{ steps.ver.outputs.VERSION }}-source.tar.gz` | Source tarball |
+
+            ### Changes
+            ${{ steps.log.outputs.BODY }}
+
+            ---
+            Built from `${{ github.sha }}`
+          files: |
+            release/pkgui-${{ steps.ver.outputs.VERSION }}-bundle.html
+            release/pkgui-${{ steps.ver.outputs.VERSION }}-dist.zip
+            release/pkgui-${{ steps.ver.outputs.VERSION }}-source.tar.gz

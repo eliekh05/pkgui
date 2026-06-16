@@ -2,22 +2,22 @@
 
 > Universal Package Manager GUI — xterm.js powered terminal UI for 40+ package managers, with OS detection and command builder.
 
-[![CI/CD](https://github.com/eliekh05/pkgui/actions/workflows/ci.yml/badge.svg)](https://github.com/eliekh05/pkgui/actions/workflows/ci.yml)
+[![CI / CD](https://github.com/eliekh05/pkgui/actions/workflows/ci.yml/badge.svg)](https://github.com/eliekh05/pkgui/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
------
+---
 
 ## Features
 
 - **xterm.js terminal** — full interactive terminal in the browser
-- **OS detection** — detects Linux, macOS, Windows, BSD and recommends relevant managers
-- **40+ package managers** — apt, dnf, pacman, brew, winget, nix, guix, flatpak, snap, pip, npm, cargo, and many more
-- **Command builder** — select a manager, type a package, get the exact command to copy
-- **Compare view** — see install commands for the same package across every manager (`Ctrl+K`)
+- **OS detection** — auto-detects Linux, macOS, Windows, BSD and recommends the right managers
+- **40+ package managers** — apt, dnf, pacman, brew, winget, nix, guix, flatpak, snap, pip, npm, cargo, gem, and many more
+- **Command builder** — select a manager, type a package name, get the exact command
+- **Compare view** — see the install command for a package across every manager (`Ctrl+K`)
 - **4 themes** — Dark, Light, Dracula, Nord
-- **Local execution** — optional `server.js` runs commands for real on your machine
+- **Single-file releases** — every GitHub Release ships a compiled standalone `.html` you can open with no install
 
------
+---
 
 ## Quick start
 
@@ -28,48 +28,35 @@ npm install
 npm run dev        # → http://localhost:5173
 ```
 
-To also run real commands (not just generate them):
-
-```bash
-node server.js     # starts exec server on localhost:7274
-npm run dev        # in another terminal
-```
-
------
+---
 
 ## Package managers
 
 ### Linux
-
-`apt` · `dpkg` · `dnf` · `yum` · `rpm` · `zypper` · `pacman` · `yay` · `apk` · `xbps` · `portage` · `slackpkg` · `equo` · `flatpak` · `snap` · `appimage`
+`apt` · `dpkg` · `dnf` · `yum` · `rpm` · `zypper` · `pacman` · `yay` · `apk` · `xbps` · `portage` · `slackpkg` · `equo` · `flatpak` · `snap`
 
 ### macOS
-
-`brew` · `macports` · `mas`
+`brew` · `port` (MacPorts)
 
 ### Windows
-
 `winget` · `choco` · `scoop`
 
 ### BSD
-
 `pkg` (FreeBSD) · `pkgsrc` (NetBSD) · `pkg_add` (OpenBSD)
 
 ### Cross-platform / Nix
-
-`nix` · `nixos-rebuild` · `guix`
+`nix` · `guix`
 
 ### Language
+`pip` · `npm` · `yarn` · `cargo` · `gem` · `composer` · `go` · `nuget` · `conda`
 
-`pip` · `npm` · `yarn` · `cargo` · `gem` · `composer` · `go` · `nuget` · `conda` · `maven`
-
------
+---
 
 ## Terminal commands
 
 ```
 detect              Detect OS and suggest managers
-list [os]           List all managers (filter: linux / macos / windows / bsd)
+list [os]           List all managers  (linux / macos / windows / bsd)
 use <manager>       Select active package manager
 install <pkg>       Generate install command
 remove <pkg>        Generate remove command
@@ -79,7 +66,7 @@ search <query>      Generate search command
 info <pkg>          Generate info command
 listpkgs            Generate list-installed command
 clean               Generate cleanup command
-compare <pkg>       Compare install command across all managers
+compare <pkg>       Compare install command across every manager
 theme <name>        Switch theme: dark / light / dracula / nord
 clear               Clear terminal
 version             Show version
@@ -87,11 +74,11 @@ version             Show version
 
 **Keyboard shortcuts:** `↑↓` history · `Ctrl+C` cancel · `Ctrl+L` clear · `Ctrl+K` compare modal · `Ctrl+/` focus search
 
------
+---
 
 ## Adding a package manager
 
-Open `src/managers.js` and add an entry to `PACKAGE_MANAGERS`:
+Edit `src/managers.js` and add to the `PACKAGE_MANAGERS` array:
 
 ```js
 {
@@ -102,7 +89,6 @@ Open `src/managers.js` and add an entry to `PACKAGE_MANAGERS`:
   distros: ['MyDistro'],
   icon: '📦',
   color: '#ff0000',
-  detectCmd: 'which mypkg',
   commands: {
     install: (pkg) => `mypkg add ${pkg}`,
     remove:  (pkg) => `mypkg rm ${pkg}`,
@@ -117,34 +103,43 @@ Open `src/managers.js` and add an entry to `PACKAGE_MANAGERS`:
 }
 ```
 
-Then add a test in `src/managers.test.js` and open a PR.
+Add a test in `src/managers.test.js` then open a PR.
 
------
+---
+
+## CI / CD
+
+| Event | What happens |
+|-------|-------------|
+| Push to `main` | Tests run → SPA builds → `dist/` uploaded as artifact |
+| Pull request | Tests run |
+| `git tag v*.*.*` | Tests → build → **single-file compiled bundle** → GitHub Release published |
+
+### Creating a release
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+GitHub Actions builds everything and publishes the release automatically with:
+- `pkgui-1.0.0-bundle.html` — single compiled file, open in any browser
+- `pkgui-1.0.0-dist.zip` — full build for self-hosting
+- `pkgui-1.0.0-source.tar.gz` — source tarball
+
+---
 
 ## Scripts
 
 ```bash
-npm run dev          # development server
-npm run build        # production build → dist/
-npm test             # run vitest tests
-node server.js       # local command execution server
+npm run dev      # dev server
+npm run build    # production build → dist/
+npm test         # vitest tests
+node server.js   # optional local execution backend
 ```
 
------
-
-## CI/CD
-
-- **Push to `main`** → test → build → deploy to Cloudflare Pages (preview)
-- **Tag `v*.*.*`** → test → build → single-file bundle → GitHub Release → deploy production
-
-```bash
-# Create a release
-git tag v1.2.0
-git push origin v1.2.0
-```
-
------
+---
 
 ## License
 
-MIT — see <LICENSE>
+MIT — see [LICENSE](LICENSE)
