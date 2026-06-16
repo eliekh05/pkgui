@@ -139,44 +139,56 @@ jobs:
 
       - name: Generate changelog
         if: steps.ver.outputs.skip != 'true'
-        id: log
         run: |
           PREV=$(git tag --sort=-v:refname | head -1)
           if [ -n "$PREV" ]; then
-            BODY=$(git log ${PREV}..HEAD --pretty=format:"- %s" --no-merges | head -40)
+            git log ${PREV}..HEAD --pretty=format:"- %s" --no-merges | head -40 > /tmp/changelog.md
           else
-            BODY=$(git log --pretty=format:"- %s" --no-merges | head -20)
+            git log --pretty=format:"- %s" --no-merges | head -20 > /tmp/changelog.md
           fi
-          echo "BODY<<EOF" >> $GITHUB_OUTPUT
-          echo "$BODY"    >> $GITHUB_OUTPUT
-          echo "EOF"      >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         if: steps.ver.outputs.skip != 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          name: pkgui v${{ steps.ver.outputs.VERSION }}
-          tag_name: v${{ steps.ver.outputs.VERSION }}
-          prerelease: ${{ contains(steps.ver.outputs.VERSION, '-') }}
-          body: |
-            ## 📦 pkgui v${{ steps.ver.outputs.VERSION }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.VERSION }}
+          TAG: ${{ steps.ver.outputs.TAG }}
+          SHA: ${{ github.sha }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "pkgui $TAG"
+          git push origin "$TAG"
 
-            ### Downloads
+          PRERELEASE_FLAG=""
+          if [[ "$VERSION" == *-* ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
 
-            | File | Description |
-            |------|-------------|
-            | `pkgui-${{ steps.ver.outputs.VERSION }}-standalone.zip` | **Recommended** — unzip, run `./start` or `npm run server` — UI + exec in one step |
-            | `pkgui-${{ steps.ver.outputs.VERSION }}-bundle.html` | Single HTML file only (no command execution unless served via server.js) |
-            | `pkgui-${{ steps.ver.outputs.VERSION }}-dist.zip` | Full build output for self-hosting |
-            | `pkgui-${{ steps.ver.outputs.VERSION }}-source.tar.gz` | Source tarball |
+          {
+            echo "## 📦 pkgui v${VERSION}"
+            echo ""
+            echo "### Downloads"
+            echo ""
+            echo "| File | Description |"
+            echo "|------|-------------|"
+            echo "| \`pkgui-${VERSION}-standalone.zip\` | **Recommended** — unzip, run \`./start\` or \`npm run server\` — UI + exec in one step |"
+            echo "| \`pkgui-${VERSION}-bundle.html\` | Single HTML file only (no command execution unless served via server.js) |"
+            echo "| \`pkgui-${VERSION}-dist.zip\` | Full build output for self-hosting |"
+            echo "| \`pkgui-${VERSION}-source.tar.gz\` | Source tarball |"
+            echo ""
+            echo "### Changes"
+            cat /tmp/changelog.md
+            echo ""
+            echo "---"
+            echo "Built from \`${SHA}\`"
+          } > /tmp/release-notes.md
 
-            ### Changes
-            ${{ steps.log.outputs.BODY }}
-
-            ---
-            Built from `${{ github.sha }}`
-          files: |
-            release/pkgui-${{ steps.ver.outputs.VERSION }}-standalone.zip
-            release/pkgui-${{ steps.ver.outputs.VERSION }}-bundle.html
-            release/pkgui-${{ steps.ver.outputs.VERSION }}-dist.zip
-            release/pkgui-${{ steps.ver.outputs.VERSION }}-source.tar.gz
+          gh release create "$TAG" \
+            --title "pkgui v${VERSION}" \
+            --notes-file /tmp/release-notes.md \
+            $PRERELEASE_FLAG \
+            "release/pkgui-${VERSION}-standalone.zip" \
+            "release/pkgui-${VERSION}-bundle.html" \
+            "release/pkgui-${VERSION}-dist.zip" \
+            "release/pkgui-${VERSION}-source.tar.gz"
