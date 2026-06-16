@@ -111,17 +111,18 @@ Add a test in `src/managers.test.js` then open a PR.
 
 | Event | What happens |
 |-------|-------------|
-| Push to `main` | Tests run → SPA builds → **auto-release if `package.json` version is new** |
+| Push to `main` | Tests run → SPA builds → **auto-release when there are new commits** |
 | Pull request | Tests run |
 
 ### Creating a release
 
-Bump the version in `package.json`, then push to `main`. CI will detect the new version, build artifacts, and publish a GitHub Release automatically.
+Just push to `main`. If there are commits since the last release, CI automatically bumps the patch version and publishes a GitHub Release (e.g. `v1.0.0` → `v1.0.1`).
 
 ```bash
-npm version patch          # bumps 1.0.0 → 1.0.1 in package.json
 git push origin main
 ```
+
+To release a specific version (minor/major bump), update `version` in `package.json` before pushing.
 
 Each release includes:
 - `pkgui-{version}-bundle.html` — single compiled file, open in any browser
