@@ -1,10 +1,10 @@
 {
-  "name": "pkgui",
+  "name": "@eliekh05/pkgui",
   "version": "1.0.0",
   "description": "Universal Package Manager GUI — xterm.js powered terminal UI for 40+ package managers",
   "type": "module",
   "bin": {
-    "pkgui": "./bin/pkgui.js"
+    "pkgui": "bin/pkgui"
   },
   "files": [
     "bin",
@@ -36,6 +36,9 @@
   },
   "keywords": ["package-manager", "xterm", "terminal", "gui", "cli"],
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-web-links": "^0.12.0",

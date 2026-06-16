@@ -24,7 +24,7 @@
 ### Install from npm
 
 ```bash
-npm install -g pkgui
+npm install -g @eliekh05/pkgui
 pkgui              # opens http://127.0.0.1:7274 with UI + exec server
 ```
 
@@ -121,7 +121,7 @@ Add a test in `src/managers.test.js` then open a PR.
 | Event | What happens |
 |-------|-------------|
 | Push to `main` | Tests run → SPA builds → **auto-release when there are new commits** |
-| GitHub Release published | **npm publish** (`pkgui` on [npmjs.com](https://www.npmjs.com/package/pkgui)) |
+| GitHub Release published | **npm publish** ([`@eliekh05/pkgui`](https://www.npmjs.com/package/@eliekh05/pkgui)) via OIDC in `ci.yml` |
 | Pull request | Tests run |
 
 ### Creating a release
@@ -140,15 +140,20 @@ Uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) (OIDC)
 
 **One-time setup on [npmjs.com](https://www.npmjs.com):**
 
-1. Publish `pkgui` once manually if the package does not exist yet (`npm publish --access public` with 2FA).
-2. Go to **pkgui → Settings → Trusted Publisher → GitHub Actions** and add:
+1. Publish once manually if the package does not exist yet:
+   ```bash
+   node scripts/prepare-npm.mjs
+   npm login
+   npm publish
+   ```
+2. Go to **@eliekh05/pkgui → Settings → Trusted Publisher → GitHub Actions** and add:
    - Organization or user: `eliekh05`
    - Repository: `pkgui`
-   - Workflow filename: `publish-npm.yml`
+   - Workflow filename: `ci.yml`
    - Environment: *(leave blank)*
 3. Optional: under **Publishing access**, set *Require 2FA and disallow tokens* after verifying CI publish works.
 
-When CI creates a GitHub Release, it calls `.github/workflows/publish-npm.yml` to publish via OIDC.
+When CI creates a GitHub Release, the `publish-npm` job in `ci.yml` publishes via OIDC.
 
 Each release includes:
 - `pkgui-{version}-standalone.zip` — **recommended** — unzip, run `./start` (or `node server.js`) — opens UI with exec server

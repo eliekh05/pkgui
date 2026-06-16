@@ -196,15 +196,44 @@ jobs:
             "release/pkgui-${VERSION}-dist.zip" \
             "release/pkgui-${VERSION}-source.tar.gz"
 
-  # GITHUB_TOKEN releases don't fire release:published for other workflows,
-  # so call the npm publish workflow directly after a successful release.
+  # GITHUB_TOKEN releases don't fire release:published for other workflows.
   publish-npm:
     name: Publish to npm
     needs: release
     if: needs.release.outputs.skip != 'true'
+    runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
-    uses: ./.github/workflows/publish-npm.yml
-    with:
-      version: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Prepare npm for OIDC trusted publishing
+        run: |
+          npm install -g npm@latest
+          echo "npm $(npm --version)"
+          NPMRC="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+          if [ -f "$NPMRC" ]; then
+            grep -v '_authToken' "$NPMRC" | grep -v 'always-auth' > "$NPMRC.tmp" || true
+            mv "$NPMRC.tmp" "$NPMRC"
+          fi
+          echo "registry=https://registry.npmjs.org/" >> "$NPMRC"
+
+      - name: Set version
+        run: |
+          npm version "${{ needs.release.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Build bundle for npm package
+        run: VITE_VERSION="${{ needs.release.outputs.version }}" node scripts/prepare-npm.mjs
+        env:
+          NODE_ENV: production
+
+      - name: Publish to npm
+        run: npm publish --access public --ignore-scripts
