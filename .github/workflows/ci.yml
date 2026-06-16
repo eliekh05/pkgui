@@ -66,6 +66,9 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: write
+    outputs:
+      version: ${{ steps.ver.outputs.VERSION }}
+      skip: ${{ steps.ver.outputs.skip }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -192,3 +195,16 @@ jobs:
             "release/pkgui-${VERSION}-bundle.html" \
             "release/pkgui-${VERSION}-dist.zip" \
             "release/pkgui-${VERSION}-source.tar.gz"
+
+  # GITHUB_TOKEN releases don't fire release:published for other workflows,
+  # so call the npm publish workflow directly after a successful release.
+  publish-npm:
+    name: Publish to npm
+    needs: release
+    if: needs.release.outputs.skip != 'true'
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/publish-npm.yml
+    with:
+      version: ${{ needs.release.outputs.version }}

@@ -148,7 +148,7 @@ Uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) (OIDC)
    - Environment: *(leave blank)*
 3. Optional: under **Publishing access**, set *Require 2FA and disallow tokens* after verifying CI publish works.
 
-When CI creates a GitHub Release, `.github/workflows/publish-npm.yml` builds the bundle and publishes via OIDC.
+When CI creates a GitHub Release, it calls `.github/workflows/publish-npm.yml` to publish via OIDC.
 
 Each release includes:
 - `pkgui-{version}-standalone.zip` — **recommended** — unzip, run `./start` (or `node server.js`) — opens UI with exec server
