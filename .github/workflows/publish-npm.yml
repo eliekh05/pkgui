@@ -1,0 +1,55 @@
+name: Publish to npm
+
+# Trusted Publishing (OIDC) — no NPM_TOKEN required.
+# https://docs.npmjs.com/trusted-publishers/
+#
+# One-time setup on npmjs.com → pkgui → Settings → Trusted Publisher → GitHub Actions:
+#   Organization or user:  eliekh05
+#   Repository:            pkgui
+#   Workflow filename:     publish-npm.yml
+#   Environment:           (leave blank)
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+jobs:
+  publish:
+    name: npm publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify npm supports trusted publishing
+        run: |
+          NPM_VER=$(npm --version)
+          echo "npm $NPM_VER"
+          npm install -g npm@latest
+          echo "upgraded to npm $(npm --version)"
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Build bundle for npm package
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VITE_VERSION="${VERSION#v}" node scripts/prepare-npm.mjs
+        env:
+          NODE_ENV: production
+
+      - name: Set version from release tag
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+      - name: Publish to npm
+        run: npm publish --access public

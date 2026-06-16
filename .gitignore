@@ -1,3 +1,6 @@
 .DS_Store
 /dist
+/dist-bundle
+/release
+/pkgui.html
 /node_modules
