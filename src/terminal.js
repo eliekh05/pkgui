@@ -307,7 +307,7 @@ export class PkguiTerminal {
       `  ${C.yellow}clear${C.reset}               Clear terminal (also Ctrl+L)`,
       `  ${C.yellow}version${C.reset}             Show version`,
       '',
-      `${C.bold}${C.brightWhite}EXECUTION${C.reset} ${C.dim}(requires node server.js running)${C.reset}`,
+      `${C.bold}${C.brightWhite}EXECUTION${C.reset} ${C.dim}(included in npm run dev)${C.reset}`,
       `  ${C.brightGreen}run${C.reset}                 Execute the last generated command locally`,
       `  ${C.dim}Ctrl+C cancels a running command · stdin is forwarded interactively${C.reset}`,
       '',
@@ -554,7 +554,7 @@ export class PkguiTerminal {
     if (!this._execAvailable) {
       this.term.writeln('')
       this.term.writeln(`${C.yellow}⚠  Exec server not running.${C.reset}`)
-      this.term.writeln(`${C.dim}  Start it in a separate terminal:${C.reset}  ${C.brightYellow}node server.js${C.reset}`)
+      this.term.writeln(`${C.dim}  Use${C.reset}  ${C.brightYellow}npm run dev${C.reset}  ${C.dim}or start it separately:${C.reset}  ${C.brightYellow}npm run server${C.reset}`)
       this.term.writeln('')
       return
     }

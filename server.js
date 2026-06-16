@@ -17,22 +17,35 @@ import { createServer }  from 'node:http'
 import { spawn }         from 'node:child_process'
 import { randomUUID }    from 'node:crypto'
 
-const PORT   = 7274
-const HOST   = 'http://127.0.0.1'
-const ORIGIN = 'http://127.0.0.1:5173'
+const PORT     = 7274
+const HOSTNAME = '127.0.0.1'
+const BASE_URL = `http://${HOSTNAME}:${PORT}`
 
 // id → { cmd, proc, sseClients: Set<res> }
 const sessions = new Map()
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function setCORS(res) {
-  res.setHeader('Access-Control-Allow-Origin',  ORIGIN)
+function isAllowedOrigin(origin) {
+  if (!origin) return false
+  try {
+    const { hostname } = new URL(origin)
+    return hostname === '127.0.0.1' || hostname === 'localhost'
+  } catch {
+    return false
+  }
+}
+
+function setCORS(req, res) {
+  const origin = req.headers.origin
+  if (isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 }
 
-function jsonRes(res, data, status = 200) {
-  setCORS(res)
+function jsonRes(req, res, data, status = 200) {
+  setCORS(req, res)
   res.writeHead(status, { 'Content-Type': 'application/json' })
   res.end(JSON.stringify(data))
 }
@@ -56,28 +69,28 @@ function broadcast(session, type, data) {
 
 // ── Request router ────────────────────────────────────────────────────────────
 const server = createServer(async (req, res) => {
-  setCORS(res)
+  setCORS(req, res)
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204)
     return res.end()
   }
 
-  const { pathname } = new URL(req.url, `http://${HOST}`)
+  const { pathname } = new URL(req.url, BASE_URL)
   const parts = pathname.split('/').filter(Boolean) // e.g. ['exec','<id>','stream']
 
   try {
 
     // ── GET /health ────────────────────────────────────────────────────────────
     if (req.method === 'GET' && pathname === '/health') {
-      return jsonRes(res, { ok: true, sessions: sessions.size })
+      return jsonRes(req, res, { ok: true, sessions: sessions.size })
     }
 
     // ── POST /exec ─────────────────────────────────────────────────────────────
     if (req.method === 'POST' && pathname === '/exec') {
       const { cmd, cwd } = await readBody(req)
       if (!cmd || typeof cmd !== 'string') {
-        return jsonRes(res, { error: 'cmd (string) required' }, 400)
+        return jsonRes(req, res, { error: 'cmd (string) required' }, 400)
       }
 
       const id  = randomUUID()
@@ -115,15 +128,15 @@ const server = createServer(async (req, res) => {
       })
 
       log(id, 'start', cmd)
-      return jsonRes(res, { id, cmd })
+      return jsonRes(req, res, { id, cmd })
     }
 
     // ── GET /exec/:id/stream ───────────────────────────────────────────────────
     if (req.method === 'GET' && parts[0] === 'exec' && parts[2] === 'stream') {
       const session = sessions.get(parts[1])
-      if (!session) return jsonRes(res, { error: 'Session not found' }, 404)
+      if (!session) return jsonRes(req, res, { error: 'Session not found' }, 404)
 
-      setCORS(res)
+      setCORS(req, res)
       res.writeHead(200, {
         'Content-Type':      'text/event-stream',
         'Cache-Control':     'no-cache',
@@ -140,13 +153,13 @@ const server = createServer(async (req, res) => {
     // ── POST /exec/:id/stdin ───────────────────────────────────────────────────
     if (req.method === 'POST' && parts[0] === 'exec' && parts[2] === 'stdin') {
       const session = sessions.get(parts[1])
-      if (!session) return jsonRes(res, { error: 'Session not found' }, 404)
+      if (!session) return jsonRes(req, res, { error: 'Session not found' }, 404)
 
       const { text } = await readBody(req)
       if (text && session.proc.stdin?.writable) {
         session.proc.stdin.write(text)
       }
-      return jsonRes(res, { ok: true })
+      return jsonRes(req, res, { ok: true })
     }
 
     // ── POST /exec/:id/kill ────────────────────────────────────────────────────
@@ -156,20 +169,20 @@ const server = createServer(async (req, res) => {
         session.proc.kill('SIGINT')
         log(parts[1], 'kill', session.cmd)
       }
-      return jsonRes(res, { ok: true })
+      return jsonRes(req, res, { ok: true })
     }
 
-    jsonRes(res, { error: 'Not found' }, 404)
+    jsonRes(req, res, { error: 'Not found' }, 404)
 
   } catch (err) {
     console.error(err)
-    jsonRes(res, { error: err.message }, 500)
+    jsonRes(req, res, { error: err.message }, 500)
   }
 })
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-server.listen(PORT, HOST, () => {
-  console.log(`\x1b[32m✓\x1b[0m \x1b[1mpkgui exec server\x1b[0m  →  http://${HOST}:${PORT}`)
+server.listen(PORT, HOSTNAME, () => {
+  console.log(`\x1b[32m✓\x1b[0m \x1b[1mpkgui exec server\x1b[0m  →  ${BASE_URL}`)
   console.log(`  \x1b[2mListening on localhost only · Ctrl+C to stop\x1b[0m\n`)
 })
 

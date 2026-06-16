@@ -3,7 +3,6 @@ name: CI / CD
 on:
   push:
     branches: [main]
-    tags: ['v*.*.*']
   pull_request:
     branches: [main]
 
@@ -54,21 +53,21 @@ jobs:
           path: dist/
           retention-days: 7
 
-  # ─── On tag v*.*.* → build bundle → publish GitHub Release ──────────────────
+  # ─── Auto-release when package.json version is new ───────────────────────────
   #
-  #  main branch  → normal source code lives here (what you develop)
-  #  git tag      → triggers this job → produces ONE compiled .html file
-  #                 attached to the GitHub Release as a download
+  #  Bump "version" in package.json, push to main → CI tests, builds, and
+  #  publishes a GitHub Release (tag v{version} + bundle.html + zip + tarball).
   #
   #  To release:
-  #    git tag v1.0.0
-  #    git push origin v1.0.0
+  #    npm version patch   # or minor / major
+  #    git push origin main --follow-tags   # optional: tag is created by CI instead
+  #    git push origin main
   # ────────────────────────────────────────────────────────────────────────────
   release:
     name: GitHub Release
     needs: test
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: write
     steps:
@@ -83,19 +82,35 @@ jobs:
 
       - run: npm ci
 
-      - name: Extract version from tag
+      - name: Resolve version
         id: ver
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Releasing version $VERSION"
 
-      # Step 1 — normal build (goes into dist.zip)
+      - name: Skip if tag already exists
+        id: check
+        run: |
+          git fetch --tags --force
+          if git rev-parse "${{ steps.ver.outputs.TAG }}" >/dev/null 2>&1; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Tag ${{ steps.ver.outputs.TAG }} already exists — skipping release."
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "New version — will publish ${{ steps.ver.outputs.TAG }}."
+          fi
+
       - name: Build SPA
+        if: steps.check.outputs.skip != 'true'
         run: npm run build
         env:
           NODE_ENV: production
           VITE_VERSION: ${{ steps.ver.outputs.VERSION }}
 
-      # Step 2 — single-file bundle (the main release asset)
       - name: Build single-file bundle
+        if: steps.check.outputs.skip != 'true'
         run: |
           BUNDLE_SINGLE=1 npx vite build --outDir dist-bundle
           node scripts/inline-bundle.js
@@ -103,15 +118,15 @@ jobs:
           NODE_ENV: production
           VITE_VERSION: ${{ steps.ver.outputs.VERSION }}
 
-      # Step 3 — package everything into release/
       - name: Package artifacts
+        if: steps.check.outputs.skip != 'true'
         run: node scripts/package.js ${{ steps.ver.outputs.VERSION }}
 
-      # Step 4 — auto changelog from git log
       - name: Generate changelog
+        if: steps.check.outputs.skip != 'true'
         id: log
         run: |
-          PREV=$(git tag --sort=-version:refname | sed -n '2p')
+          PREV=$(git tag --sort=-v:refname | head -1)
           if [ -n "$PREV" ]; then
             BODY=$(git log ${PREV}..HEAD --pretty=format:"- %s" --no-merges | head -40)
           else
@@ -121,8 +136,8 @@ jobs:
           echo "$BODY"    >> $GITHUB_OUTPUT
           echo "EOF"      >> $GITHUB_OUTPUT
 
-      # Step 5 — publish release with the compiled bundle as primary asset
       - name: Create GitHub Release
+        if: steps.check.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           name: pkgui v${{ steps.ver.outputs.VERSION }}

@@ -4,7 +4,7 @@
   "description": "Universal Package Manager GUI — xterm.js powered terminal UI for 40+ package managers",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",

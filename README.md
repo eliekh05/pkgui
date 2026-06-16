@@ -25,7 +25,7 @@
 git clone https://github.com/eliekh05/pkgui
 cd pkgui
 npm install
-npm run dev        # → http://localhost:5173
+npm run dev        # → http://localhost:5173 (starts exec server too)
 ```
 
 ---
@@ -111,31 +111,32 @@ Add a test in `src/managers.test.js` then open a PR.
 
 | Event | What happens |
 |-------|-------------|
-| Push to `main` | Tests run → SPA builds → `dist/` uploaded as artifact |
+| Push to `main` | Tests run → SPA builds → **auto-release if `package.json` version is new** |
 | Pull request | Tests run |
-| `git tag v*.*.*` | Tests → build → **single-file compiled bundle** → GitHub Release published |
 
 ### Creating a release
 
+Bump the version in `package.json`, then push to `main`. CI will detect the new version, build artifacts, and publish a GitHub Release automatically.
+
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+npm version patch          # bumps 1.0.0 → 1.0.1 in package.json
+git push origin main
 ```
 
-GitHub Actions builds everything and publishes the release automatically with:
-- `pkgui-1.0.0-bundle.html` — single compiled file, open in any browser
-- `pkgui-1.0.0-dist.zip` — full build for self-hosting
-- `pkgui-1.0.0-source.tar.gz` — source tarball
+Each release includes:
+- `pkgui-{version}-bundle.html` — single compiled file, open in any browser
+- `pkgui-{version}-dist.zip` — full build for self-hosting
+- `pkgui-{version}-source.tar.gz` — source tarball
 
 ---
 
 ## Scripts
 
 ```bash
-npm run dev      # dev server
+npm run dev      # dev server + local execution backend
 npm run build    # production build → dist/
 npm test         # vitest tests
-node server.js   # optional local execution backend
+npm run server   # execution backend only (e.g. with the standalone .html)
 ```
 
 ---
